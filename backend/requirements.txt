@@ -1,0 +1,42 @@
+# 🌐 Backend Framework
+fastapi==0.110.0
+uvicorn[standard]==0.27.1
+
+# 🔌 WebSockets
+python-socketio==5.11.1
+aiohttp==3.9.3
+
+# 🧠 Machine Learning
+scikit-learn==1.4.1
+numpy==1.26.4
+pandas==2.2.1
+
+# 🐝 Swarm / Async
+asyncio
+networkx==3.2.1
+
+# 🔴 Redis (Swarm Communication)
+redis==5.0.1
+
+# 🔍 Elasticsearch (SIEM Logs)
+elasticsearch==8.11.1
+
+# 🕵️ Dark Web / Requests
+requests==2.31.0
+beautifulsoup4==4.12.3
+
+# 🔐 Authentication
+python-jose==3.3.0
+passlib[bcrypt]==1.7.4
+
+# 🌐 Network Scanning
+scapy==2.5.0
+
+# 📊 Data Handling
+python-dotenv==1.0.1
+
+# 🧪 Testing
+pytest==8.0.2
+
+# 📝 Logging & Utils
+loguru==0.7.2
