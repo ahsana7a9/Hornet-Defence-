@@ -4,6 +4,7 @@ import json
 from core.agent_manager import AgentManager
 from core.pheromone_system import PheromoneSystem
 from core.anomaly_detector import detect_anomaly
+from core.elasticsearch_client import log_event  # <--- NEW IMPORT
 
 class SwarmEngine:
     def __init__(self, redis_host='localhost', redis_port=6379):
@@ -23,7 +24,7 @@ class SwarmEngine:
         self.redis_client.publish(channel, json.dumps(data))
 
     def run(self):
-        print("[Swarm] Engine started with Redis backbone...")
+        print("[Swarm] Engine started with Redis & Elasticsearch logging...")
         while self.running:
             self.execute_cycle()
             time.sleep(2)
@@ -40,16 +41,24 @@ class SwarmEngine:
                     "agent_id": agent.id,
                     "source": data["source"],
                     "timestamp": time.time(),
-                    "severity": "high"
+                    "severity": "high",
+                    "details": data  # Optional: include raw agent data
                 }
                 
                 print(f"[Swarm] Threat detected by Agent {agent.id}")
                 
-                # 1. Local tagging
+                # 1. Local tagging (Pheromones)
                 self.pheromones.mark(data["source"])
 
-                # 2. Global Broadcast via Redis
-                self.publish_event("swarm_threats", threat_info)
+                # 2. Global Broadcast (Redis)
+                # Ensure the channel name matches your AgentListener ("threats")
+                self.publish_event("threats", threat_info)
                 
-                # 3. Traditional notify
+                # 3. Persistent Logging (Elasticsearch) <--- NEW LOGIC
+                try:
+                    log_event("threats", threat_info)
+                except Exception as e:
+                    print(f"[Error] Failed to log to Elasticsearch: {e}")
+
+                # 4. Local traditional notify
                 self.agent_manager.broadcast_threat(data["source"])
