@@ -1,17 +1,22 @@
-import jwt
+from jose import jwt, JWTError
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import os
 
-# Move your secret to a config or env file later!
-SECRET = "your_super_secret_key" 
-security = HTTPBearer()
+SECRET = os.getenv("JWT_SECRET", "shadowmesh_secret_change_in_production")
+security = HTTPBearer(auto_error=False)
 
-def verify_token(token=Depends(security)):
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization header missing",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     try:
-        # Decode the token sent in the Authorization header
-        payload = jwt.decode(token.credentials, SECRET, algorithms=["HS256"])
+        payload = jwt.decode(credentials.credentials, SECRET, algorithms=["HS256"])
         return payload
-    except Exception:
+    except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",

@@ -3,26 +3,45 @@ version: "3.8"
 services:
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    environment:
+      - JWT_SECRET=${JWT_SECRET:-shadowmesh_secret_change_in_production}
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     depends_on:
       - redis
       - elasticsearch
+    restart: unless-stopped
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: dockerfile
     ports:
-      - "5173:5173"
+      - "5000:5000"
+    environment:
+      - VITE_API_URL=http://backend:8000/api
+    depends_on:
+      - backend
+    restart: unless-stopped
 
   redis:
-    image: redis:latest
+    image: redis:7-alpine
     ports:
       - "6379:6379"
+    restart: unless-stopped
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
     environment:
       - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
     ports:
       - "9200:9200"
+    restart: unless-stopped
