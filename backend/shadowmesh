@@ -1,0 +1,50 @@
+// ShadowMesh Palantir-Level UI with 3D Swarm + SIEM Dashboard
+
+import { Canvas } from "@react-three/fiber"; import { OrbitControls } from "@react-three/drei"; import { useEffect, useState } from "react"; import { motion } from "framer-motion"; import * as THREE from "three"; import { LineChart, Line, XAxis, YAxis, Tooltip } from "recharts";
+
+// 3D Swarm Nodes function SwarmNode({ position }) { return ( <mesh position={position}> <sphereGeometry args={[0.2, 16, 16]} /> <meshStandardMaterial color="yellow" emissive="orange" /> </mesh> ); }
+
+function Swarm3D() { const nodes = Array.from({ length: 20 }, () => [ (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10, ]);
+
+return ( <Canvas style={{ height: 400 }}> <ambientLight intensity={0.5} /> <pointLight position={[10, 10, 10]} /> {nodes.map((pos, i) => ( <SwarmNode key={i} position={pos} /> ))} <OrbitControls /> </Canvas> ); }
+
+export default function Dashboard() { const [logs, setLogs] = useState([]); const [data, setData] = useState([]);
+
+useEffect(() => { const interval = setInterval(() => { const time = new Date().toLocaleTimeString(); setLogs((prev) => [...prev.slice(-20), Threat detected at ${time}]); setData((prev) => [...prev.slice(-10), { time, value: Math.random() * 100 }]); }, 2000); return () => clearInterval(interval); }, []);
+
+return ( <div className="min-h-screen bg-black text-white flex"> {/* Sidebar */} <div className="w-64 bg-[#0a0a0a] border-r border-yellow-500/10 p-4"> <h1 className="text-2xl text-yellow-400 mb-6">ShadowMesh</h1> <ul className="space-y-4 text-gray-400"> <li>Dashboard</li> <li>Agents</li> <li>Threats</li> <li>Dark Web</li> </ul> </div>
+
+{/* Main */}
+  <div className="flex-1 p-6 space-y-6">
+    <div className="flex justify-between">
+      <h2 className="text-xl">Command Center</h2>
+      <span className="text-green-400">● ACTIVE</span>
+    </div>
+
+    {/* 3D Swarm */}
+    <motion.div className="bg-[#111] p-4 rounded-xl">
+      <h3 className="text-yellow-400 mb-2">3D Swarm Visualization</h3>
+      <Swarm3D />
+    </motion.div>
+
+    {/* Charts */}
+    <div className="bg-[#111] p-4 rounded-xl">
+      <h3 className="text-blue-400 mb-2">Threat Activity</h3>
+      <LineChart width={500} height={200} data={data}>
+        <XAxis dataKey="time" />
+        <YAxis />
+        <Tooltip />
+        <Line type="monotone" dataKey="value" stroke="#00ffcc" />
+      </LineChart>
+    </div>
+
+    {/* Logs */}
+    <div className="bg-black p-4 rounded-xl h-40 overflow-y-auto border border-green-500/20">
+      {logs.map((log, i) => (
+        <p key={i} className="text-green-400 text-sm font-mono">{log}</p>
+      ))}
+    </div>
+  </div>
+</div>
+
+); }
