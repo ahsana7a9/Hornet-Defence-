@@ -1,0 +1,28 @@
+version: "3.8"
+
+services:
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+      - elasticsearch
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    environment:
+      - discovery.type=single-node
+    ports:
+      - "9200:9200"
