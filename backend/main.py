@@ -4,6 +4,7 @@ import asyncio
 import ctypes
 import uvicorn
 import sys
+import winreg as reg 
 from fastapi import FastAPI, WebSocket, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -115,6 +116,21 @@ async def forget_signature(item: dict):
     # Logic to remove hash from agent_memory.json
     await agent_report("WARDEN", "Signature purged from memory. Target is no longer trusted.")
     return {"status": "purged"}
+
+def ensure_persistence():
+    """Warden: Locks the SWAT team into the Windows boot sequence."""
+    app_path = sys.executable
+    key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
+    try:
+        key = reg.OpenKey(reg.HKEY_CURRENT_USER, key_path, 0, reg.KEY_SET_VALUE)
+        reg.SetValueEx(key, "HornetSWAT", 0, reg.REG_SZ, app_path)
+        reg.CloseKey(key)
+        logger.info("🔒 [WARDEN]: Persistence established in Registry.")
+    except Exception as e:
+        logger.error(f"⚠️ [WARDEN]: Persistence failed: {e}")
+
+# Call this before starting threads
+ensure_persistence()    
  
 # --- BACKGROUND THREADS ---
 def start_api():
