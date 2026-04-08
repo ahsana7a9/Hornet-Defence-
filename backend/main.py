@@ -12,7 +12,7 @@ from core.scanner import scan_system
 from core.quarantine import restore_file, delete_quarantined_file
 from core.usb_monitor import monitor_usb_with_callback
 from core.memory import learn_trust
-from tray_app import create_tray_icon  # NEW: Tray logic
+from tray_app import create_tray_icon  
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -35,11 +35,15 @@ clients = []
 
 # --- AGENT LOGIC ---
 async def broadcast(data):
+    """Sends tactical updates to all connected Dashboards."""
     for client in clients:
-        try: await client.send_json(data)
-        except: continue
+        try: 
+            await client.send_json(data)
+        except Exception: 
+            continue
 
 async def agent_report(agent, message):
+    """Allows agents to speak directly to the Tactical Terminal."""
     icons = {"VANGUARD": "📡", "INTERCEPTOR": "⚔️", "WARDEN": "🔒"}
     await broadcast({
         "type": "agent_msg",
@@ -51,46 +55,68 @@ async def agent_report(agent, message):
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     clients.append(websocket)
+    # Welcome message on successful uplink
     await websocket.send_json({"type": "agent_msg", "text": "🛡️ [SYSTEM]: SWAT Agents online. Uplink secure."})
+    
     try:
         while not stop_event.is_set():
-            # Minimal timeout to keep loop responsive to stop_event
-            await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
-    except:
+            # Wait for data or timeout to check stop_event
+            try:
+                await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
+            except asyncio.TimeoutError:
+                continue
+    except Exception:
         pass
     finally:
-        clients.remove(websocket)
+        if websocket in clients:
+            clients.remove(websocket)
 
 @app.get("/scan")
 async def run_scan(background_tasks: BackgroundTasks):
-    await agent_report("INTERCEPTOR", "Initiating area sweep. Standby for signature analysis.")
-    background_tasks.add_task(scan_system, broadcast_func=agent_report) 
+    """Triggers Interceptor for a full sector sweep."""
+    async def scan_wrapper():
+        await agent_report("INTERCEPTOR", "Initiating area sweep. Standby for signature analysis.")
+        # Perform the scan
+        results = scan_system(broadcast_func=agent_report)
+        # Send final results to the UI
+        await broadcast({"type": "usb_scan", "results": results})
+        await agent_report("INTERCEPTOR", "Sector sweep complete. Threats logged to Vault.")
+
+    background_tasks.add_task(scan_wrapper) 
     return {"status": "started"}
 
 @app.post("/restore")
 async def run_restore(item: dict):
+    """Warden: Moves file from Vault back to original location."""
     if "file_hash" in item:
         learn_trust(item["file_hash"])
-    await agent_report("WARDEN", f"User override detected. Restoring target and updating memory.")
-    return restore_file(item["quarantined_path"], item["original_path"])
+    
+    await agent_report("WARDEN", f"User override detected. Restoring target and updating intelligence.")
+    res = restore_file(item["quarantined_path"], item["original_path"])
+    return res
 
 @app.post("/delete-quarantine")
 async def run_delete(item: dict):
+    """Warden: Permanent neutralization of a threat."""
     await agent_report("WARDEN", "Neutralizing threat permanently. Clearing vault space.")
-    return delete_quarantined_file(item["quarantined_path"])
+    res = delete_quarantined_file(item["quarantined_path"])
+    return res
 
 # --- BACKGROUND THREADS ---
 def start_api():
     """Runs the FastAPI server in a background thread."""
-    uvicorn.run(app, host="127.0.0.1", port=8000, log_level="error")
+    # We use log_level 'error' to keep the background console clean
+    uvicorn.run(app, host="127.0.0.1", port=8000, log_level="error", access_log=False)
 
 def start_usb_monitor():
-    """Vanguard Agent: Monitors USB in a background thread."""
+    """Vanguard Agent: Monitors USB ports in a background thread."""
+    # Create a new event loop for this specific thread
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     
     def callback(results):
         if not stop_event.is_set():
+            # Run the reporting in the thread's own loop
             loop.run_until_complete(agent_report("VANGUARD", "Perimeter breach! Intercepting data..."))
             loop.run_until_complete(broadcast({"type": "usb_scan", "results": results}))
     
@@ -98,9 +124,9 @@ def start_usb_monitor():
 
 # --- ENTRY POINT ---
 if __name__ == "__main__":
-    # 1. Admin Check
+    # 1. Admin Check (Crucial for Quarantine/Shredding)
     if not ctypes.windll.shell32.IsUserAnAdmin():
-        logger.warning("⚠️ Running without Admin rights. Quarantine features may fail.")
+        print("⚠️ [CRITICAL]: Admin rights missing. Protection levels reduced.")
 
     # 2. Start API Thread
     api_thread = threading.Thread(target=start_api, daemon=True)
@@ -110,9 +136,11 @@ if __name__ == "__main__":
     usb_thread = threading.Thread(target=start_usb_monitor, daemon=True)
     usb_thread.start()
 
-    # 4. Start Tray Icon (This blocks the main thread and keeps the app alive)
-    # create_tray_icon will call stop_event.set() when the user clicks 'Exit'
-    create_tray_icon(stop_event)
+    # 4. Start Tray Icon 
+    # This keeps the main thread alive. Closing the tray will trigger stop_event.
+    try:
+        create_tray_icon(stop_event)
+    except KeyboardInterrupt:
+        stop_event.set()
     
-    # If the tray icon is closed/exited, the script ends here
     sys.exit(0)
