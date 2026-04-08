@@ -1,13 +1,13 @@
-# 🐝 Hornet Defence – Frontend
+# Hornet Defence – Frontend
 
 This is the frontend dashboard for Hornet Defence, a USB-based antivirus system designed to scan, detect, and neutralize threats.
 
-## 🚀 Tech Stack
+## Tech Stack
 - React
 - Vite
 - Tailwind CSS
 
-## 📦 Installation
+##  Installation
 
 npm install
 
@@ -15,16 +15,16 @@ npm install
 
 npm run dev
 
-##  Backend Connection
+## Backend Connection
 Make sure backend server is running on:
 http://localhost:8000
 
-##  Features
+## Features
 - System Scan Dashboard
 - USB Auto Detection UI
 - Threat Detection Results
 - Quarantine Management
 
-##  Notes
+## Notes
 - Requires backend API to function
 - Ensure CORS is enabled
