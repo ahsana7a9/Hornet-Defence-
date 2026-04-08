@@ -1,202 +1,142 @@
 import { useEffect, useState, useRef } from "react";
 import axios from "axios";
+import { motion, AnimatePresence } from "framer-motion";
+import { Shield, ShieldAlert, Settings, Activity, Trash2, RotateCcw, Terminal } from "lucide-react";
 
-// 📟 TACTICAL MATRIX TERMINAL COMPONENT
+// --- COMPONENTS ---
+
+const SidebarItem = ({ icon: Icon, label, active, onClick }) => (
+  <div 
+    onClick={onClick}
+    className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-all ${
+      active ? "bg-blue-600/20 text-blue-400 border-r-2 border-blue-500" : "text-gray-500 hover:text-gray-300"
+    }`}
+  >
+    <Icon size={20} />
+    <span className="font-medium">{label}</span>
+  </div>
+);
+
 const TacticalTerminal = ({ logs }) => {
-  const logEndRef = useRef(null);
-  useEffect(() => {
-    logEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [logs]);
+  const endRef = useRef(null);
+  useEffect(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), [logs]);
 
   return (
-    <div style={{
-      background: "#050505",
-      color: "#00ff41",
-      padding: "15px",
-      borderRadius: "5px",
-      fontFamily: "'Courier New', Courier, monospace",
-      height: "180px",
-      overflowY: "auto",
-      border: "1px solid #003300",
-      boxShadow: "inset 0 0 10px #000",
-      fontSize: "12px",
-      marginTop: "20px",
-      lineHeight: "1.4"
-    }}>
-      <div style={{ color: "#008f11", borderBottom: "1px solid #003300", marginBottom: "8px", fontWeight: "bold" }}>
-        📡 DIRECT AGENT UPLINK -- SECURE_CHANNEL_ACTIVE
+    <div className="bg-black/80 border border-green-900/30 p-4 rounded-lg font-mono text-[11px] h-48 overflow-y-auto shadow-inner text-green-400">
+      <div className="text-green-700 border-b border-green-900/20 mb-2 pb-1 uppercase tracking-widest text-[10px]">
+        Live Agent Uplink Established
       </div>
-      {logs.map((log, i) => (
-        <div key={i} style={{ marginBottom: "2px" }}>
-          <span style={{ color: "#004400" }}>{">"}</span> {log}
-        </div>
-      ))}
-      <div ref={logEndRef} />
+      {logs.map((log, i) => <div key={i} className="mb-1 opacity-90"><span className="text-green-900 mr-2">»</span>{log}</div>)}
+      <div ref={endRef} />
     </div>
   );
 };
 
+// --- MAIN APP ---
+
 function App() {
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [results, setResults] = useState([]);
-  const [quarantine, setQuarantine] = useState([]);
+  const [tacticalLogs, setTacticalLogs] = useState(["[SYSTEM]: Service synchronized with Tray Icon."]);
   const [status, setStatus] = useState("Idle");
-  const [progress, setProgress] = useState(0);
-  const [protection, setProtection] = useState(true);
-  
-  // SWAT AGENT LOGS
-  const [tacticalLogs, setTacticalLogs] = useState(["[SYSTEM]: Initializing SWAT Framework...", "[SYSTEM]: Agents VANGUARD, INTERCEPTOR, and WARDEN standing by."]);
 
   useEffect(() => {
     const ws = new WebSocket("ws://localhost:8000/ws");
-    
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      
-      // 1. Handle Agent Personalities
-      if (data.type === "agent_msg") {
-        setTacticalLogs(prev => [...prev, data.text]);
-      }
-
-      // 2. Handle USB Scout Events
-      if (data.type === "usb_scan") {
-        setResults((prev) => [...data.results, ...prev]);
-        setStatus("USB Event Detected");
-      }
+    ws.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+      if (data.type === "agent_msg") setTacticalLogs(prev => [...prev, data.text]);
+      if (data.type === "usb_scan") setResults(prev => [...data.results, ...prev]);
     };
-
-    ws.onclose = () => setTacticalLogs(prev => [...prev, "❌ [CRITICAL]: Uplink lost. Backend unreachable."]);
-    
     return () => ws.close();
   }, []);
 
-  const runScan = async () => {
-    setResults([]);
-    setProgress(0);
-    setStatus("Scanning...");
-    
-    try {
-      await axios.get("http://localhost:8000/scan");
-      
-      // Progress simulation for UX
-      let p = 0;
-      const interval = setInterval(() => {
-        p += 2;
-        setProgress(p);
-        if (p >= 100) {
-          clearInterval(interval);
-          setStatus("Scan Complete");
-        }
-      }, 500);
-      
-    } catch (err) {
-      setStatus("Scan Failed");
-      setTacticalLogs(prev => [...prev, "⚠️ [INTERCEPTOR]: Tactical sweep aborted. Connection error."]);
-    }
-  };
-
-  const handleDelete = async (quarantinedPath) => {
-    if (!window.confirm("PERMANENT DELETE: This will shred the file. Proceed?")) return;
-    try {
-      const res = await axios.post("http://localhost:8000/delete-quarantine", {
-        quarantined_path: quarantinedPath
-      });
-      if (res.data.status === "DELETED") {
-        setResults(prev => prev.filter(item => item.quarantined !== quarantinedPath));
-      }
-    } catch (err) { alert("Delete failed."); }
-  };
-
-  const handleRestore = async (quarantinedPath, originalPath, fileHash) => {
-    try {
-      const res = await axios.post("http://localhost:8000/restore", {
-        quarantined_path: quarantinedPath,
-        original_path: originalPath,
-        file_hash: fileHash // Pass hash so agents "Learn" to trust it
-      });
-      if (res.data.status === "RESTORED") {
-        setResults(prev => prev.filter(item => item.file !== originalPath));
-      }
-    } catch (err) { alert("Restore failed."); }
-  };
-
-  useEffect(() => {
-    setQuarantine(results.filter(r => r.action === "QUARANTINED" && r.quarantined));
-  }, [results]);
-
   return (
-    <div style={{ background: "#0a0a0a", color: "white", minHeight: "100vh", padding: "30px", fontFamily: "monospace" }}>
+    <div className="flex h-screen bg-[#050505] text-gray-200 font-sans overflow-hidden">
       
-      {/* HEADER */}
-      <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #333", paddingBottom: "10px" }}>
-        <h1 style={{ margin: 0, color: "#f1c40f", letterSpacing: "2px" }}>🛡️ HORNET DEFENCE</h1>
-        <button 
-          onClick={() => setProtection(!protection)} 
-          style={{ 
-            background: protection ? "rgba(39, 174, 96, 0.2)" : "rgba(192, 57, 43, 0.2)", 
-            color: protection ? "#27ae60" : "#c0392b",
-            border: `1px solid ${protection ? "#27ae60" : "#c0392b"}`, 
-            padding: "10px 20px", borderRadius: "4px", cursor: "pointer", fontWeight: "bold"
-          }}
-        >
-          {protection ? "SHIELD ACTIVE" : "SHIELD DOWN"}
-        </button>
-      </div>
+      {/* SIDEBAR */}
+      <nav className="w-64 bg-[#0a0a0a] border-r border-white/5 flex flex-col py-6">
+        <div className="px-6 mb-10 flex items-center gap-3">
+          <div className="w-8 h-8 bg-yellow-500 rounded-lg flex items-center justify-center text-black font-bold italic">H</div>
+          <h1 className="text-lg font-bold tracking-tighter text-white">HORNET <span className="text-blue-500">DEFENCE</span></h1>
+        </div>
 
-      {/* MATRIX TERMINAL */}
-      <TacticalTerminal logs={tacticalLogs} />
+        <div className="flex-1 space-y-1">
+          <SidebarItem icon={Activity} label="Dashboard" active={activeTab === "dashboard"} onClick={() => setActiveTab("dashboard")} />
+          <SidebarItem icon={ShieldAlert} label="Quarantine" active={activeTab === "quarantine"} onClick={() => setActiveTab("quarantine")} />
+          <SidebarItem icon={Settings} label="Settings" active={activeTab === "settings"} onClick={() => setActiveTab("settings")} />
+        </div>
 
-      {/* PROGRESS BAR */}
-      {status === "Scanning..." && (
-        <div style={{ marginTop: "20px" }}>
-          <div style={{ background: "#111", height: "4px", borderRadius: "2px", overflow: "hidden", border: "1px solid #333" }}>
-            <div style={{ background: "#f1c40f", height: "100%", width: `${progress}%`, transition: "width 0.4s", boxShadow: "0 0 10px #f1c40f" }}></div>
+        <div className="px-6 mt-auto">
+          <div className="p-4 bg-green-500/5 border border-green-500/20 rounded-xl text-center">
+            <p className="text-[10px] uppercase text-green-500 font-bold mb-1">Protection Live</p>
+            <p className="text-[9px] text-gray-500 leading-tight">Vanguard & Interceptor are watching your ports.</p>
           </div>
         </div>
-      )}
+      </nav>
 
-      {/* DASHBOARD STATS */}
-      <div style={{ display: "flex", gap: "20px", marginTop: "20px" }}>
-        <div style={{ flex: 1, background: "#0f0f0f", padding: "15px", borderRadius: "8px", border: "1px solid #222" }}>
-          <p style={{ margin: 0, color: "#555", fontSize: "10px", textTransform: "uppercase" }}>Deployment Status</p>
-          <h3 style={{ margin: "5px 0", color: "#3498db" }}>{status}</h3>
-        </div>
-        <div style={{ flex: 1, background: "#0f0f0f", padding: "15px", borderRadius: "8px", border: "1px solid #222", borderLeft: "4px solid #e74c3c" }}>
-          <p style={{ margin: 0, color: "#555", fontSize: "10px", textTransform: "uppercase" }}>Neutralized</p>
-          <h3 style={{ margin: "5px 0", color: "#e74c3c" }}>{results.filter(r => r.status?.includes("INFECTED")).length}</h3>
-        </div>
-      </div>
+      {/* MAIN CONTENT AREA */}
+      <main className="flex-1 overflow-y-auto p-8 relative">
+        <AnimatePresence mode="wait">
+          
+          {/* DASHBOARD TAB */}
+          {activeTab === "dashboard" && (
+            <motion.div 
+              key="dashboard"
+              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+              className="max-w-4xl mx-auto space-y-6"
+            >
+              <header className="flex justify-between items-end">
+                <div>
+                  <h2 className="text-3xl font-bold text-white">Command Center</h2>
+                  <p className="text-gray-500">Real-time threat monitoring and agent comms.</p>
+                </div>
+                <button 
+                  onClick={() => axios.get("http://localhost:8000/scan")}
+                  className="bg-blue-600 hover:bg-blue-500 px-6 py-2 rounded-lg font-bold text-white transition-all shadow-lg shadow-blue-600/20"
+                >
+                  Initiate Sector Scan
+                </button>
+              </header>
 
-      <button 
-        onClick={runScan} 
-        disabled={status === "Scanning..."}
-        style={{ 
-            marginTop: "20px", width: "100%", padding: "12px", 
-            background: "transparent", color: "#3498db", border: "1px solid #3498db", 
-            borderRadius: "4px", cursor: "pointer", fontWeight: "bold",
-            opacity: status === "Scanning..." ? 0.5 : 1
-        }}
-      >
-        [ EXECUTE FULL SECTOR SCAN ]
-      </button>
-
-      {/* QUARANTINE VAULT */}
-      <div style={{ marginTop: "40px", padding: "20px", background: "#050505", border: "1px solid #e74c3c", borderRadius: "8px", boxShadow: "0 0 15px rgba(231, 76, 60, 0.1)" }}>
-        <h2 style={{ color: "#e74c3c", marginTop: 0, fontSize: "18px" }}>☣️ QUARANTINE VAULT</h2>
-        {quarantine.length === 0 ? <p style={{ color: "#333" }}>Vault empty. Perimeter secure.</p> : 
-          quarantine.map((q, i) => (
-            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0a0a0a", padding: "12px", marginBottom: "8px", borderRadius: "4px", border: "1px solid #222" }}>
-              <div style={{ overflow: "hidden" }}>
-                <p style={{ margin: 0, fontSize: "12px", color: "#eee" }}>{q.file}</p>
-                <small style={{ color: "#555" }}>Hash: {q.file_hash?.substring(0, 12)}...</small>
+              <div className="grid grid-cols-3 gap-6">
+                <div className="bg-[#0f0f0f] p-6 rounded-2xl border border-white/5">
+                  <p className="text-xs uppercase text-gray-500 font-bold">Infections</p>
+                  <p className="text-3xl font-bold text-red-500 mt-2">{results.filter(r => r.status?.includes("INFECTED")).length}</p>
+                </div>
+                {/* Add more stat cards here */}
               </div>
-              <div style={{ display: "flex", gap: "10px" }}>
-                <button onClick={() => handleRestore(q.quarantined, q.file, q.file_hash)} style={{ background: "#27ae60", color: "white", border: "none", padding: "6px 12px", borderRadius: "3px", cursor: "pointer", fontSize: "11px" }}>RESTORE</button>
-                <button onClick={() => handleDelete(q.quarantined)} style={{ background: "#c0392b", color: "white", border: "none", padding: "6px 12px", borderRadius: "3px", cursor: "pointer", fontSize: "11px" }}>SHRED</button>
+
+              <TacticalTerminal logs={tacticalLogs} />
+            </motion.div>
+          )}
+
+          {/* QUARANTINE TAB */}
+          {activeTab === "quarantine" && (
+            <motion.div 
+              key="quarantine"
+              initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
+              className="max-w-4xl mx-auto"
+            >
+              <h2 className="text-3xl font-bold text-white mb-6">☣️ Quarantine Vault</h2>
+              <div className="space-y-3">
+                {results.filter(r => r.quarantined).map((q, i) => (
+                  <div key={i} className="bg-[#0f0f0f] border border-white/5 p-4 rounded-xl flex justify-between items-center group">
+                    <div>
+                      <p className="text-sm font-medium text-gray-200">{q.file.split('\\').pop()}</p>
+                      <p className="text-[10px] text-gray-500 font-mono mt-1">{q.file}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button className="p-2 hover:bg-green-500/10 text-green-500 rounded-lg transition-colors"><RotateCcw size={18} /></button>
+                      <button className="p-2 hover:bg-red-500/10 text-red-500 rounded-lg transition-colors"><Trash2 size={18} /></button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
-          ))
-        }
-      </div>
+            </motion.div>
+          )}
+
+        </AnimatePresence>
+      </main>
     </div>
   );
 }
