@@ -50,9 +50,10 @@ async def broadcast(data):
 
 # 3. HTTP Endpoints (Scan & Restore)
 @app.get("/scan")
-def run_scan():
-    files = scan_system()
-    return {"status": "scan_complete", "files": files}
+def run_scan(background_tasks: BackgroundTasks):
+    # This fires and forgets, so the UI stays alive
+    background_tasks.add_task(scan_system)
+    return {"status": "started", "message": "Scan is running in background"}
 
 @app.post("/restore")
 def run_restore(item: dict):
