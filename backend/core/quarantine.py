@@ -43,3 +43,18 @@ def restore_file(quarantined_path, original_path):
         return {"status": "RESTORED", "path": original_path}
     except Exception as e:
         return {"status": "FAILED", "error": str(e)}
+
+# --- NEW: Delete Logic ---
+def delete_quarantined_file(quarantined_path):
+    """Permanently deletes a file from the vault."""
+    try:
+        # Safety check: Prevent deleting files outside the quarantine directory
+        if not quarantined_path.startswith(QUARANTINE_DIR):
+            return {"status": "FAILED", "error": "Unauthorized path"}
+            
+        if os.path.exists(quarantined_path):
+            os.remove(quarantined_path)
+            return {"status": "DELETED"}
+        return {"status": "FAILED", "error": "File not found"}
+    except Exception as e:
+        return {"status": "FAILED", "error": str(e)}
