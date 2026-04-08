@@ -1,4 +1,4 @@
-# ShadowMesh / Hornet 
+# Hornet Defence 
 
 ## Project Overview
 
