@@ -1,4 +1,4 @@
-# ShadowMesh / Hornet — Replit Project
+# ShadowMesh / Hornet 
 
 ## Project Overview
 
