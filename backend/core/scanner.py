@@ -20,13 +20,21 @@ def get_file_hash(filepath):
 
 def scan_system(scan_path="C:/"):
     results = []
+    
+    # Define critical directories to skip
+    PROTECTED_DIRS = ["C:\\Windows", "C:\\Program Files", "C:\\Program Files (x86)"]
 
     for root, dirs, files in os.walk(scan_path):
+        # --- SAFETY FILTER ---
+        # Skip the entire directory if it's in a protected path
+        if any(root.startswith(p) for p in PROTECTED_DIRS):
+            continue
+
         for file in files:
             full_path = os.path.join(root, file)
-            file_hash = get_file_hash(full_path)
-
-            if not file_hash:
+            
+            # Double check for specific file path safety
+            if "Windows" in full_path or "System32" in full_path:
                 continue
 
             # --- TIER 1: Local Signature Check ---
