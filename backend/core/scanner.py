@@ -2,6 +2,7 @@ import os
 import hashlib
 from core.virustotal import check_hash_virustotal
 from core.quarantine import quarantine_file
+
 # Local database (fast, offline)
 known_malware_hashes = {
     "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855": "Test Malware"
@@ -30,42 +31,41 @@ def scan_system(scan_path="C:/"):
 
             # --- TIER 1: Local Signature Check ---
             if file_hash in known_malware_hashes:
+                # If hit locally, we quarantine immediately
+                q_result = quarantine_file(full_path)
                 results.append({
                     "file": full_path,
                     "status": "INFECTED (LOCAL)",
-                    "threat": known_malware_hashes[file_hash]
+                    "threat": known_malware_hashes[file_hash],
+                    "action": q_result.get("status", "QUARANTINED")
                 })
-                continue # Skip VT if we already know it's bad locally
+                continue 
 
             # --- TIER 2: VirusTotal Check ---
             try:
                 vt_result = check_hash_virustotal(file_hash)
                 
-              if vt_result["malicious"] > 0:
-
-    q_result = quarantine_file(full_path)
-
-    results.append({
-        "file": full_path,
-        "status": "INFECTED",
-        "engine_hits": vt_result["malicious"],
-        "action": q_result["status"]
-    })
+                if vt_result and vt_result.get("malicious", 0) > 0:
+                    # Execute Quarantine for VT hits
+                    q_result = quarantine_file(full_path)
+                    
                     results.append({
                         "file": full_path,
                         "status": "INFECTED (VIRUSTOTAL)",
-                        "engine_hits": vt_result["malicious"]
+                        "engine_hits": vt_result["malicious"],
+                        "action": q_result.get("status", "QUARANTINED")
                     })
                 else:
                     results.append({
                         "file": full_path,
-                        "status": "SAFE"
+                        "status": "SAFE",
+                        "action": "NONE"
                     })
+                    
             except Exception as e:
-                # Handle API errors (like rate limits or no internet)
                 print(f"Error checking VT for {file}: {e}")
 
-            # Stop after 50 files for safety during testing
+            # Safety limit for testing
             if len(results) >= 50:
                 return results
 
