@@ -2,7 +2,13 @@ import json
 import os
 
 MEMORY_FILE = "agent_memory.json"
-
+ 
+def get_all_memory():
+    if not os.path.exists(MEMORY_FILE):
+        return {}
+    with open(MEMORY_FILE, "r") as f:
+        return json.load(f)
+ 
 def load_memory():
     if not os.path.exists(MEMORY_FILE):
         return {"trusted_hashes": [], "user_overrides": 0}
