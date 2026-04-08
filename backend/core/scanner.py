@@ -41,7 +41,16 @@ def scan_system(scan_path="C:/"):
             try:
                 vt_result = check_hash_virustotal(file_hash)
                 
-                if vt_result and vt_result.get("malicious", 0) > 0:
+              if vt_result["malicious"] > 0:
+
+    q_result = quarantine_file(full_path)
+
+    results.append({
+        "file": full_path,
+        "status": "INFECTED",
+        "engine_hits": vt_result["malicious"],
+        "action": q_result["status"]
+    })
                     results.append({
                         "file": full_path,
                         "status": "INFECTED (VIRUSTOTAL)",
