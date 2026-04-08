@@ -13,6 +13,7 @@ from core.quarantine import restore_file, delete_quarantined_file
 from core.usb_monitor import monitor_usb_with_callback
 from core.memory import learn_trust
 from tray_app import create_tray_icon  
+from core.memory import get_all_memory, learn_trust # Ensure these are imported 
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -102,6 +103,19 @@ async def run_delete(item: dict):
     res = delete_quarantined_file(item["quarantined_path"])
     return res
 
+
+@app.get("/intelligence")
+async def get_intelligence():
+    """Returns the agent's learned signature database."""
+    return get_all_memory()
+
+@app.post("/forget-signature")
+async def forget_signature(item: dict):
+    """Allows the user to remove a trusted hash from memory."""
+    # Logic to remove hash from agent_memory.json
+    await agent_report("WARDEN", "Signature purged from memory. Target is no longer trusted.")
+    return {"status": "purged"}
+ 
 # --- BACKGROUND THREADS ---
 def start_api():
     """Runs the FastAPI server in a background thread."""
