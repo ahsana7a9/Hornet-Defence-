@@ -75,7 +75,7 @@ function App() {
         await axios.post("http://localhost:8000/delete-quarantine", { quarantined_path: path });
         setResults(prev => prev.filter(r => r.quarantined !== path));
       } catch (err) {
-        setTacticalLogs(prev => [...prev, "⚠️ [WARDEN]: Shredding failed. Target resisted."]);
+        setTacticalLogs(prev => [...prev, " [WARDEN]: Shredding failed. Target resisted."]);
       }
       setShreddingId(null);
     }, 600);
