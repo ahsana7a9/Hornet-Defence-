@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.api_routes import router
 from core.swarm_engine import SwarmEngine
+from core.scanner import scan_system 
 import threading
 import logging
 
@@ -27,7 +28,13 @@ def root():
 @app.get("/health")
 def health():
     return {"status": "ok"}
-
+@app.get("/scan")
+def run_scan():
+    files = scan_system()
+    return {
+        "status": "scan_complete",
+        "files": files
+    }
 @app.on_event("startup")
 def startup_event():
     def delayed_swarm():
