@@ -23,7 +23,7 @@ function App() {
 
     <ul>
   {results.map((item, i) => (
-    <li key={i}>
+    <li key={i}> style={{color: item.status === "INFECTED" ? "red" : "green"}}>
       {item.file} — {item.status}
       {item.engine_hits && ` (${item.engine_hits} engines flagged)`}
     </li>
