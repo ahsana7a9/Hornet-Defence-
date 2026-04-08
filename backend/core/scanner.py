@@ -2,7 +2,7 @@ import os
 import hashlib
 from core.virustotal import check_hash_virustotal
 from core.quarantine import quarantine_file
-
+from core.heuristics import heuristic_scan
 # Local database (fast, offline)
 known_malware_hashes = {
     "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855": "Test Malware"
