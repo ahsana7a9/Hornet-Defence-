@@ -3,3 +3,9 @@ __pycache__
 .env
 venv
 dist
+.env
+node_modules/
+__pycache__/
+dist/
+build/
+*.log
