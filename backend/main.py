@@ -1,52 +1,44 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from api.api_routes import router
-from core.swarm_engine import SwarmEngine
-from core.scanner import scan_system 
+from fastapi import FastAPI, WebSocket
+from core.usb_monitor import monitor_usb_with_callback
 import threading
-import logging
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+app = FastAPI()
 
-app = FastAPI(title="ShadowMesh API", version="1.0.0")
+clients = []
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    clients.append(websocket)
 
-app.include_router(router, prefix="/api")
+    try:
+        while True:
+            await websocket.receive_text()
+    except:
+        clients.remove(websocket)
 
-@app.get("/")
-def root():
-    return {"message": "ShadowMesh is running", "status": "operational"}
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
-@app.get("/scan")
-def run_scan():
-    files = scan_system()
-    return {
-        "status": "scan_complete",
-        "files": files
-    }
+async def broadcast(data):
+    for client in clients:
+        await client.send_json(data)
+
+
+def start_usb_monitor():
+    import asyncio
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    def callback(results):
+        loop.run_until_complete(broadcast({
+            "type": "usb_scan",
+            "results": results
+        }))
+
+    monitor_usb_with_callback(callback)
+
+
 @app.on_event("startup")
-def startup_event():
-    def delayed_swarm():
-        import time
-        time.sleep(3)
-        logger.info("[ShadowMesh] Starting swarm engine...")
-        try:
-            swarm = SwarmEngine()
-            swarm.run()
-        except Exception as e:
-            logger.error(f"[Swarm] Engine stopped: {e}")
-
-    thread = threading.Thread(target=delayed_swarm, daemon=True)
+def startup():
+    thread = threading.Thread(target=start_usb_monitor, daemon=True)
     thread.start()
-    logger.info("[ShadowMesh] API started — swarm engine will begin in 3 seconds")
