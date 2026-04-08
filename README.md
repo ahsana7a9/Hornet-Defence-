@@ -20,7 +20,18 @@ A distributed cybersecurity defense and monitoring system using swarm intelligen
 
 ## Quick Start
 
-### Option 1 — One Command (Linux/macOS)
+### Option 1 — One Command (Linux/macOS) 
+## License & Usage
+
+This project is proprietary software.
+
+You are NOT allowed to:
+- Copy the code
+- Modify the code
+- Reuse any part of it
+- Distribute it
+
+Without explicit permission from the author.
 
 ```bash
 chmod +x run.sh
