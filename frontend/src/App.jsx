@@ -1,120 +1,139 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import axios from "axios"; // Using axios as it handles JSON automatically
 
 function App() {
-  const [results, setResults] = useState([]); 
-  const [usbResults, setUsbResults] = useState([]); 
-  const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState([]);
+  const [quarantine, setQuarantine] = useState([]);
+  const [status, setStatus] = useState("Idle");
+  const [protection, setProtection] = useState(true);
 
+  // 🔌 WebSocket (USB real-time)
   useEffect(() => {
     const ws = new WebSocket("ws://localhost:8000/ws");
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.type === "usb_scan") {
-        setUsbResults(data.results);
+        // Spread to keep old results + add new USB results
+        setResults((prev) => [...data.results, ...prev]);
+        setStatus("USB Threat Detected!");
       }
     };
     return () => ws.close();
   }, []);
 
+  // 🔍 Run Scan
   const runScan = async () => {
-    setLoading(true);
+    setStatus("Scanning...");
     try {
       const res = await axios.get("http://localhost:8000/scan");
-      setResults(res.data.files || res.data.results || []);
+      // Note: check if your backend returns data.results or data.files
+      const newResults = res.data.files || res.data.results || [];
+      setResults(newResults);
+      setStatus("Scan Complete");
     } catch (err) {
-      console.error("Scan failed:", err);
-    } finally {
-      setLoading(false);
+      setStatus("Scan Failed");
+      console.error(err);
     }
   };
 
+  // 🩹 Restore Logic (Carried over from Version 1)
   const handleRestore = async (quarantinedPath, originalPath) => {
     try {
       const res = await axios.post("http://localhost:8000/restore", {
         quarantined_path: quarantinedPath,
         original_path: originalPath
       });
-      alert(res.data.status === "RESTORED" ? "File restored successfully!" : "Restore failed.");
-      // Refresh list logic could go here
+      if (res.data.status === "RESTORED") {
+        alert("File restored!");
+        // Remove from results so it disappears from UI
+        setResults(prev => prev.filter(item => item.file !== originalPath));
+      }
     } catch (err) {
-      console.error("Restore error:", err);
+      alert("Restore failed.");
     }
   };
 
-  return (
-    <div style={{ padding: "40px", fontFamily: "sans-serif", backgroundColor: "#f4f4f9", minHeight: "100vh" }}>
-      <h1 style={{ color: "#2c3e50" }}>🐝 Hornet Defence</h1>
+  // 📊 Live Stats Calculation
+  const threats = results.filter(r => r.status?.includes("INFECTED")).length;
+  const suspicious = results.filter(r => r.status === "SUSPICIOUS").length;
 
-      {/* Manual Scan Section */}
-      <section style={{ marginBottom: "40px", padding: "20px", background: "white", borderRadius: "8px", boxShadow: "0 2px 4px rgba(0,0,0,0.1)" }}>
-        <h2>System Scanner</h2>
-        <button 
-          onClick={runScan} 
-          disabled={loading}
-          style={{ 
-            padding: "10px 20px", 
-            backgroundColor: loading ? "#bdc3c7" : "#2980b9", 
-            color: "white", border: "none", borderRadius: "4px", cursor: loading ? "not-allowed" : "pointer" 
+  // 🧱 Sync Quarantine List
+  useEffect(() => {
+    const q = results.filter(r => r.action === "QUARANTINED");
+    setQuarantine(q);
+  }, [results]);
+
+  return (
+    <div style={{ background: "#0a0a0a", color: "white", minHeight: "100vh", padding: "30px", fontFamily: "monospace" }}>
+
+      {/* HEADER */}
+      <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #333", paddingBottom: "10px" }}>
+        <h1 style={{ margin: 0, color: "#f1c40f" }}>🛡️ HORNET DEFENCE</h1>
+        <button
+          onClick={() => setProtection(!protection)}
+          style={{
+            background: protection ? "#27ae60" : "#c0392b",
+            color: "white", border: "none", padding: "10px 20px", borderRadius: "4px", cursor: "pointer", fontWeight: "bold"
           }}
         >
-          {loading ? "Scanning Engine Active..." : "Start System Scan"}
+          {protection ? "PROTECTION ACTIVE" : "PROTECTION DISABLED"}
         </button>
+      </div>
 
-        <h3>Scan Results</h3>
-        <ul style={{ listStyle: "none", paddingLeft: 0 }}>
-          {results.map((item, i) => (
-            <li key={i} style={{ 
-              padding: "15px", 
-              borderBottom: "1px solid #eee", 
-              color: item.status === "SAFE" ? "#27ae60" : "#d63031",
-              backgroundColor: item.status === "SUSPICIOUS" ? "#fff9db" : "transparent"
+      {/* DASHBOARD STATS */}
+      <div style={{ display: "flex", gap: "20px", marginTop: "20px" }}>
+        <div style={{ flex: 1, background: "#1a1a1a", padding: "15px", borderRadius: "8px" }}>
+          <p style={{ margin: 0, color: "#888" }}>System Status</p>
+          <h2 style={{ margin: "5px 0", color: status === "Scanning..." ? "#3498db" : "#fff" }}>{status}</h2>
+        </div>
+        <div style={{ flex: 1, background: "#1a1a1a", padding: "15px", borderRadius: "8px", borderLeft: "4px solid red" }}>
+          <p style={{ margin: 0, color: "#888" }}>Threats Blocked</p>
+          <h2 style={{ margin: "5px 0", color: "red" }}>{threats}</h2>
+        </div>
+        <div style={{ flex: 1, background: "#1a1a1a", padding: "15px", borderRadius: "8px", borderLeft: "4px solid orange" }}>
+          <p style={{ margin: 0, color: "#888" }}>Suspicious Files</p>
+          <h2 style={{ margin: "5px 0", color: "orange" }}>{suspicious}</h2>
+        </div>
+      </div>
+
+      {/* ACTIONS */}
+      <div style={{ marginTop: "20px" }}>
+        <button onClick={runScan} style={{ padding: "10px 20px", background: "#3498db", color: "white", border: "none", borderRadius: "4px", cursor: "pointer" }}>Full System Scan</button>
+      </div>
+
+      {/* SCAN RESULTS */}
+      <div style={{ marginTop: "30px" }}>
+        <h2>Active Scans</h2>
+        {results.length === 0 && <p style={{ color: "#444" }}>No scan data available.</p>}
+        {results.map((item, i) => (
+          <div key={i} style={{
+              padding: "15px", marginBottom: "10px", borderRadius: "5px",
+              background: item.status?.includes("INFECTED") ? "#2c0000" : item.status === "SUSPICIOUS" ? "#2c1a00" : "#001a00",
+              border: `1px solid ${item.status?.includes("INFECTED") ? "red" : item.status === "SUSPICIOUS" ? "orange" : "green"}`
             }}>
-              <div>
-                <strong>{item.file}</strong> — <span>{item.status}</span>
-                
-                {/* Heuristic Reasons Update */}
-                {item.reasons && (
-                  <ul style={{ fontSize: "0.85em", color: "#e67e22", margin: "5px 0" }}>
-                    {item.reasons.map((r, idx) => (
-                      <li key={idx} style={{ listStyle: "none" }}>⚠️ {r}</li>
-                    ))}
-                  </ul>
-                )}
-
-                {item.engine_hits && <span style={{ color: "#e67e22" }}> ({item.engine_hits} engines flagged)</span>}
-                {item.action && <span style={{ fontWeight: "bold", color: "#34495e" }}> → {item.action}</span>}
-                
-                {/* Restore Button Logic */}
-                {item.status?.includes("INFECTED") && item.action === "QUARANTINED" && (
-                  <button 
-                    onClick={() => handleRestore(item.quarantined, item.file)}
-                    style={{ marginLeft: "15px", fontSize: "0.7em", padding: "2px 5px", cursor: "pointer" }}
-                  >
-                    Undo/Restore
-                  </button>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {/* Auto USB Scan Section */}
-      <section style={{ padding: "20px", background: "#2d3436", color: "white", borderRadius: "8px" }}>
-        <h2>Live USB Monitor (Auto)</h2>
-        {usbResults.length === 0 ? (
-          <p style={{ color: "#b2bec3" }}>Monitoring for hardware events...</p>
-        ) : (
-          <ul style={{ listStyle: "none", paddingLeft: 0 }}>
-            {usbResults.map((item, i) => (
-              <li key={i} style={{ color: "#fab1a0", padding: "5px 0" }}>
-                ⚠️ {typeof item === 'string' ? item : item.file} — {item.status}
-              </li>
+            <p style={{ margin: "0 0 5px 0" }}><strong>File:</strong> {item.file}</p>
+            <p style={{ margin: 0, fontSize: "0.9em" }}>Status: {item.status} {item.engine_hits && `(${item.engine_hits} Engines Flagged)`}</p>
+            {item.reasons && item.reasons.map((r, idx) => (
+              <p key={idx} style={{ color: "orange", fontSize: "0.8em", margin: "5px 0 0 0" }}>⚠️ {r}</p>
             ))}
-          </ul>
-        )}
-      </section>
+          </div>
+        ))}
+      </div>
+
+      {/* QUARANTINE VAULT */}
+      <div style={{ marginTop: "40px", padding: "20px", background: "#111", borderRadius: "10px", border: "1px dashed #444" }}>
+        <h2 style={{ color: "#e74c3c" }}>☣️ Quarantine Vault</h2>
+        {quarantine.length === 0 && <p style={{ color: "#444" }}>Vault is empty.</p>}
+        {quarantine.map((q, i) => (
+          <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#222", padding: "10px", marginBottom: "10px", borderRadius: "4px" }}>
+            <span style={{ fontSize: "0.8em" }}>{q.file}</span>
+            <div>
+              <button onClick={() => handleRestore(q.quarantined, q.file)} style={{ background: "#27ae60", color: "white", border: "none", padding: "5px 10px", borderRadius: "3px", cursor: "pointer", marginRight: "5px" }}>Restore</button>
+              <button style={{ background: "#c0392b", color: "white", border: "none", padding: "5px 10px", borderRadius: "3px", cursor: "pointer" }}>Delete</button>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
