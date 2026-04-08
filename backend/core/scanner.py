@@ -3,6 +3,7 @@ import hashlib
 from core.virustotal import check_hash_virustotal
 from core.quarantine import quarantine_file
 from core.heuristics import heuristic_scan
+
 # Local database (fast, offline)
 known_malware_hashes = {
     "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855": "Test Malware"
@@ -26,20 +27,22 @@ def scan_system(scan_path="C:/"):
 
     for root, dirs, files in os.walk(scan_path):
         # --- SAFETY FILTER ---
-        # Skip the entire directory if it's in a protected path
         if any(root.startswith(p) for p in PROTECTED_DIRS):
             continue
 
         for file in files:
             full_path = os.path.join(root, file)
             
-            # Double check for specific file path safety
+            # Additional granular path safety
             if "Windows" in full_path or "System32" in full_path:
+                continue
+
+            file_hash = get_file_hash(full_path)
+            if not file_hash:
                 continue
 
             # --- TIER 1: Local Signature Check ---
             if file_hash in known_malware_hashes:
-                # If hit locally, we quarantine immediately
                 q_result = quarantine_file(full_path)
                 results.append({
                     "file": full_path,
@@ -49,14 +52,25 @@ def scan_system(scan_path="C:/"):
                 })
                 continue 
 
-            # --- TIER 2: VirusTotal Check ---
+            # --- TIER 2: Heuristic Analysis ---
+            # Fast local check for suspicious patterns (code signing, hidden attributes, etc.)
+            heuristic = heuristic_scan(full_path)
+            if heuristic["score"] >= 3:
+                results.append({
+                    "file": full_path,
+                    "status": "SUSPICIOUS",
+                    "reasons": heuristic["reasons"],
+                    "action": "FLAGGED"
+                })
+                # We continue to avoid redundant VirusTotal calls if it's already highly suspicious
+                continue
+
+            # --- TIER 3: VirusTotal Check ---
             try:
                 vt_result = check_hash_virustotal(file_hash)
                 
                 if vt_result and vt_result.get("malicious", 0) > 0:
-                    # Execute Quarantine for VT hits
                     q_result = quarantine_file(full_path)
-                    
                     results.append({
                         "file": full_path,
                         "status": "INFECTED (VIRUSTOTAL)",
