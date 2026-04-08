@@ -51,4 +51,17 @@ def quarantine_file(file_path):
             "file": file_path,
             "status": "FAILED",
             "error": str(e)
-        }
+        } 
+        def restore_file(quarantined_path, original_path):
+    """Moves a file from the quarantine vault back to its original location."""
+    try:
+        # Ensure the original directory still exists before moving back
+        os.makedirs(os.path.dirname(original_path), exist_ok=True)
+        
+        shutil.move(quarantined_path, original_path)
+        # Remove read-only restrictions
+        os.chmod(original_path, 0o666) 
+        
+        return {"status": "RESTORED", "path": original_path}
+    except Exception as e:
+        return {"status": "FAILED", "error": str(e)}
