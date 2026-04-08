@@ -1,14 +1,22 @@
 import threading
 import logging
 import asyncio
-from fastapi import FastAPI, WebSocket
+import ctypes
+from fastapi import FastAPI, WebSocket, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 
 # Core Logic Imports
 from core.scanner import scan_system
-from core.quarantine import restore_file
+from core.quarantine import restore_file, delete_quarantined_file
 from core.usb_monitor import monitor_usb_with_callback
-from api.api_routes import router # Assuming you still want your modular routes
+
+# 0. ADMIN CHECK
+def is_admin():
+    try: return ctypes.windll.shell32.IsUserAnAdmin()
+    except: return False
+
+if not is_admin():
+    print("⚠️ WARNING: Not running as Administrator. Quarantine will fail.")
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -16,71 +24,56 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Hornet Defence API")
 
-# 1. Middleware (Critical for React communication)
+# 1. CORS Middleware (Allow React on port 3000)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:3000"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# 2. WebSocket Connection Manager
 clients = []
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     clients.append(websocket)
-    logger.info(f"Client connected to WebSocket. Total clients: {len(clients)}")
     try:
-        while True:
-            # Keep the connection alive
-            await websocket.receive_text()
-    except Exception:
+        while True: await websocket.receive_text()
+    except:
         clients.remove(websocket)
-        logger.info("Client disconnected from WebSocket.")
 
 async def broadcast(data):
     for client in clients:
-        try:
-            await client.send_json(data)
-        except Exception as e:
-            logger.error(f"Broadcast error: {e}")
+        try: await client.send_json(data)
+        except: continue
 
-# 3. HTTP Endpoints (Scan & Restore)
+# 2. ENDPOINTS
 @app.get("/scan")
-def run_scan(background_tasks: BackgroundTasks):
-    # This fires and forgets, so the UI stays alive
-    background_tasks.add_task(scan_system)
-    return {"status": "started", "message": "Scan is running in background"}
+async def run_scan(background_tasks: BackgroundTasks):
+    # We trigger the scan in the background so the API responds immediately
+    # In a real app, you'd send results back via WebSocket as they are found
+    background_tasks.add_task(scan_system) 
+    return {"status": "started"}
 
 @app.post("/restore")
 def run_restore(item: dict):
-    """
-    Expects: {"quarantined_path": "...", "original_path": "..."}
-    """
-    result = restore_file(item["quarantined_path"], item["original_path"])
-    return result
+    return restore_file(item["quarantined_path"], item["original_path"])
 
-# 4. Background USB Monitor Logic
+@app.post("/delete-quarantine")
+def run_delete(item: dict):
+    return delete_quarantined_file(item["quarantined_path"])
+
+# 3. USB MONITOR
 def start_usb_monitor():
-    # Create a new event loop for this specific thread to handle broadcasts
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-
     def callback(results):
-        logger.info(f"[USB Event] Detected potential threats: {len(results)}")
-        loop.run_until_complete(broadcast({
-            "type": "usb_scan",
-            "results": results
-        }))
-
-    # This function should contain the 'while True' loop for hardware monitoring
+        loop.run_until_complete(broadcast({"type": "usb_scan", "results": results}))
     monitor_usb_with_callback(callback)
 
 @app.on_event("startup")
 def startup():
-    logger.info("Initializing Hornet Defence background services...")
     thread = threading.Thread(target=start_usb_monitor, daemon=True)
     thread.start()
