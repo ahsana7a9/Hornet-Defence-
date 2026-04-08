@@ -8,7 +8,7 @@ ENTRY_POINT = "main.py"
 ICON_PATH = "icon.ico" # Ensure you have an .ico file or use icon.png
 
 def build_exe():
-    print(f"📦 [SYSTEM]: Initiating packaging for {APP_NAME}...")
+    print(f" [SYSTEM]: Initiating packaging for {APP_NAME}...")
     
     params = [
         ENTRY_POINT,
@@ -27,7 +27,7 @@ def build_exe():
     ]
 
     PyInstaller.__main__.run(params)
-    print(f"🚀 [SYSTEM]: Deployment successful. Check the /dist folder.")
+    print(f" [SYSTEM]: Deployment successful. Check the /dist folder.")
 
 if __name__ == "__main__":
     build_exe()
