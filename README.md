@@ -9,6 +9,7 @@
   <em>Powered by MARL and Llama3 Intelligence</em>
 </p>
 
+
 # Hornet-Defence 
 
 A distributed cybersecurity defense and monitoring system using swarm intelligence. Independent AI agents (ReconAgent, BruteAgent) detect anomalies in real time, coordinate via Redis, log to Elasticsearch, and visualize the swarm topology on a live dashboard.
