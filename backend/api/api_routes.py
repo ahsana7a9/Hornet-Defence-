@@ -7,6 +7,7 @@ from core.threat_eliminator import (
 )
 from core.alert_manager import get_alerts, get_alert_counts, add_alert
 from core.network_monitor import analyze_connections, get_network_stats
+from core.redis_client import get_redis  # Added for Swarm IQ access
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -16,6 +17,31 @@ router = APIRouter()
 @router.get("/status")
 def get_status():
     return {"status": "operational", "system": "Hornet-Defence"}
+
+
+# ── Swarm Intelligence (MARL Analytics) ──────────────────────────────────────
+@router.get("/swarm/intelligence", dependencies=[Depends(verify_token)])
+def get_swarm_iq():
+    """Returns the learned Q-Table from Redis."""
+    r = get_redis()
+    if not r:
+        return {"error": "Redis intelligence store offline", "knowledge_base": {}}
+    
+    try:
+        # Scan for all learned states
+        keys = r.keys("swarm_iq:*")
+        knowledge = {}
+        for key in keys:
+            # key looks like 'swarm_iq:ReconAgent-1:HIGH'
+            clean_key = key.replace("swarm_iq:", "")
+            knowledge[clean_key] = r.hgetall(key)
+            
+        return {
+            "total_learned_states": len(keys),
+            "knowledge_base": knowledge
+        }
+    except Exception as e:
+        return {"error": f"Failed to fetch IQ: {str(e)}"}
 
 
 # ── Threat Logs ─────────────────────────────────────────────────────────────
