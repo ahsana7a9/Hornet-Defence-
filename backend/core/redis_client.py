@@ -1,6 +1,7 @@
 import redis
 import json
 import logging
+from core.provenance import PROJECT_HASH  # The cryptographic seal
 
 logger = logging.getLogger(__name__)
 
@@ -10,7 +11,7 @@ def get_redis():
     global _redis_client
     if _redis_client is None:
         try:
-            # Added decode_responses=True to handle strings easily
+            # decode_responses=True ensures we get strings back from Redis
             client = redis.Redis(host='localhost', port=6379, decode_responses=True, socket_connect_timeout=2)
             client.ping()
             _redis_client = client
@@ -45,51 +46,61 @@ def update_q_value(state_key: str, action: str, reward: float):
     """
     Updates the 'Value' of an action in a specific state.
     Formula: Q_new = Q_old + alpha * (reward - Q_old)
+    The state_key now includes a cryptographic signature for ownership.
     """
     r = get_redis()
     if not r:
         return
 
     alpha = 0.1  # Learning rate
-    lookup_key = f"swarm_iq:{state_key}"
+    # Ownership Shard: Using the first 8 chars of the Project Hash
+    lookup_key = f"swarm_iq:{PROJECT_HASH[:8]}:{state_key}"
     
     try:
         # Get existing knowledge
         current_q = r.hget(lookup_key, action)
         current_q = float(current_q) if current_q else 0.0
         
-        # Calculate new intelligence
+        # Calculate new intelligence using Bellman-style update
         new_q = current_q + alpha * (reward - current_q)
         
-        # Store back in Redis
+        # Store back in Redis under the cryptographic namespace
         r.hset(lookup_key, action, new_q)
-        logger.debug(f"[RL] Updated {state_key} -> {action}: {new_q:.2f}")
+        logger.debug(f"[RL] Updated {lookup_key} -> {action}: {new_q:.2f}")
     except Exception as e:
         logger.error(f"[Redis] RL update failed: {e}")
 
 def get_best_action(state_key: str):
     """
-    Queries Redis for the action with the highest Q-value for this state.
+    Queries Redis for the action with the highest Q-value in the owner's namespace.
     """
     r = get_redis()
     if not r:
         return "NONE"
 
     try:
-        actions = r.hgetall(f"swarm_iq:{state_key}")
+        # Querying specifically within our cryptographic namespace
+        lookup_key = f"swarm_iq:{PROJECT_HASH[:8]}:{state_key}"
+        actions = r.hgetall(lookup_key)
+        
         if not actions:
             return "NONE"
         
         # Return the action with the highest score
-        return max(actions, key=actions.get)
-    except Exception:
+        # Since hgetall with decode_responses=True returns strings, we convert to float
+        return max(actions, key=lambda k: float(actions[k]))
+    except Exception as e:
+        logger.warning(f"[Redis] Action retrieval failed: {e}")
         return "NONE"
 
 def set_pheromone(source_ip: str, strength: int = 100):
     """
     Sets a digital pheromone that 'evaporates' over time.
+    Tethered to the owner's signature.
     """
     r = get_redis()
     if r:
-        # Pheromone lasts for 60 seconds (evaporation)
-        r.setex(f"pheromone:{source_ip}", 60, strength)
+        # Namespace pheromones to prevent overlap with other swarm versions
+        key = f"pheromone:{PROJECT_HASH[:8]}:{source_ip}"
+        # Pheromone lasts for 60 seconds (evaporation/decay)
+        r.setex(key, 60, strength)
