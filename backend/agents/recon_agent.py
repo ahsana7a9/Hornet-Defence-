@@ -2,6 +2,7 @@ import time
 import logging
 import random
 from core.network_monitor import analyze_connections, get_network_stats
+from agents.agent_brain import AgentBrain  # Import the new brain
 
 logger = logging.getLogger(__name__)
 
@@ -9,14 +10,15 @@ logger = logging.getLogger(__name__)
 class ReconAgent:
     """
     Reconnaissance agent — monitors real TCP connections via /proc/net/tcp.
-    Detects: port scanning, connection bursts, suspicious service access.
-    Falls back to simulation if /proc/net/tcp is unavailable.
+    Now enhanced with MARL (Reinforcement Learning) and LLM Reasoning.
     """
 
     def __init__(self, agent_id: int):
         self.id   = agent_id
         self.name = f"ReconAgent-{agent_id}"
         self._use_real = self._check_real()
+        # Initialize the AI Brain
+        self.brain = AgentBrain()
 
     def _check_real(self) -> bool:
         try:
@@ -28,9 +30,18 @@ class ReconAgent:
             return False
 
     def collect_data(self) -> dict:
+        """Collects data and appends a suggested_action from the AI brain."""
         if self._use_real:
-            return self._collect_real()
-        return self._collect_simulated()
+            data = self._collect_real()
+        else:
+            data = self._collect_simulated()
+        
+        # --- NEW MARL STEP ---
+        # Delegate decision making to the Brain (Redis Intelligence or LLM)
+        suggested_action = self.brain.decide(self.name, data)
+        data["suggested_action"] = suggested_action
+        
+        return data
 
     def _collect_real(self) -> dict:
         try:
@@ -38,7 +49,6 @@ class ReconAgent:
             net_stats   = get_network_stats()
             eth_stats   = net_stats.get("eth0", {})
 
-            # Determine primary threat source
             source = "network"
             if analysis["port_scanners"]:
                 source = analysis["port_scanners"][0]["ip"]
