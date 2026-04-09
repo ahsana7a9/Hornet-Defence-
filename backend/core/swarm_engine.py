@@ -1,17 +1,17 @@
 import time
 import logging
+import psutil  # Required for State observation
 from core.agent_manager import AgentManager
 from core.pheromone_system import PheromoneSystem
 from core.anomaly_detector import detect_anomaly
 from core.elasticsearch_client import log_event
-from core.redis_client import publish
+from core.redis_client import publish, update_q_value  # Added update_q_value
 from core.threat_eliminator import block_ip, is_blocked
 from core.alert_manager import add_alert
 
 logger = logging.getLogger(__name__)
 
 AUTO_BLOCK_THRESHOLD = 0.65
-
 
 class SwarmEngine:
     def __init__(self):
@@ -20,15 +20,42 @@ class SwarmEngine:
         self.running       = True
 
     def run(self):
-        logger.info("[Swarm] Engine started — real network monitoring active")
+        logger.info("[Swarm] Engine started — RL-enhanced network monitoring active")
         while self.running:
             try:
-                self.execute_cycle()
+                # Capture State BEFORE agent actions
+                state_before = self.get_system_state()
+                
+                self.execute_cycle(state_before)
+                
             except Exception as e:
                 logger.error(f"[Swarm] Cycle error: {e}")
             time.sleep(2)
 
-    def execute_cycle(self):
+    def get_system_state(self):
+        """Captures the current Environment State for RL."""
+        return {
+            "cpu": psutil.cpu_percent(),
+            "ram": psutil.virtual_memory().percent,
+            "conn_count": len(psutil.net_connections()),
+            "timestamp": time.time()
+        }
+
+    def calculate_reward(self, state_before, state_after, action_taken):
+        """Standard Reward Function for the Swarm."""
+        reward = 0
+        
+        # Reward for lowering CPU stress
+        if state_after['cpu'] < state_before['cpu']:
+            reward += 10
+        
+        # Penalty for 'Over-blocking' (killing connections too aggressively)
+        if state_after['conn_count'] < (state_before['conn_count'] * 0.5):
+            reward -= 20
+            
+        return reward
+
+    def execute_cycle(self, state_before):
         for agent in self.agent_manager.get_agents():
             try:
                 data   = agent.collect_data()
@@ -49,38 +76,36 @@ class SwarmEngine:
 
                     logger.info(f"[Swarm] Threat detected by {agent.name} — source: {source} score: {score:.2f}")
 
-                    # 1. Pheromone tag (local)
+                    # --- RL ACTION LOGIC ---
+                    action = "NONE"
+                    
+                    # 1. Pheromone tag (Stigmergy)
                     self.pheromones.mark(source)
 
-                    # 2. Redis broadcast to peers
-                    publish("threats", threat_info)
+                    # 2. Execute Defense Action
+                    if score >= AUTO_BLOCK_THRESHOLD and data.get("real_data") and not is_blocked(source):
+                        block_ip(source, reason=f"auto-block score={score:.2f}")
+                        action = "BLOCK"
+                        add_alert(self._severity(score), f"Auto-blocked {source}", source=agent.name)
 
-                    # 3. Persist to Elasticsearch / in-memory
+                    # 3. Capture State AFTER action to calculate Learning Reward
+                    time.sleep(0.5) # Short delay to let system stabilize
+                    state_after = self.get_system_state()
+                    
+                    # 4. Update Global Swarm Intelligence (Redis Q-Table)
+                    reward = self.calculate_reward(state_before, state_after, action)
+                    
+                    # We use a simplified state key based on severity and agent type
+                    state_key = f"{agent.name}:{self._severity(score)}"
+                    update_q_value(state_key, action, reward)
+
+                    # --- STANDARD LOGGING ---
+                    publish("threats", threat_info)
                     try:
                         log_event("threats", threat_info)
                     except Exception as e:
                         logger.warning(f"[Swarm] Log error: {e}")
 
-                    # 4. Auto-block high-confidence real threats
-                    if score >= AUTO_BLOCK_THRESHOLD and data.get("real_data") and not is_blocked(source):
-                        block_ip(source, reason=f"auto-block score={score:.2f} by {agent.name}")
-                        add_alert(
-                            self._severity(score),
-                            f"Auto-blocked {source} (score={score:.2f})",
-                            source=agent.name,
-                            metadata={"ip": source, "score": score}
-                        )
-
-                    # 5. Alert for simulated threats (demo mode)
-                    elif not data.get("real_data"):
-                        add_alert(
-                            self._severity(score),
-                            f"Simulated threat from {source} (score={score:.2f})",
-                            source=agent.name,
-                            metadata={"ip": source, "score": score, "simulated": True}
-                        )
-
-                    # 6. Broadcast to all peer agents
                     self.agent_manager.broadcast_threat(source)
 
             except Exception as e:
