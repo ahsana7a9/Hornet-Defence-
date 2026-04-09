@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="backend/assets/logo.png" width="300" alt="Hornet-Defence Logo">
+  <img src="https://raw.githubusercontent.com/ahsana7a9/Hornet-Defence-/main/backend/assets/logo.png" width="300" alt="Hornet-Defence Logo">
 </p>
 
-<h1 align="center">Hornet-Defence-</h1>
+<h1 align="center">Hornet-Defence</h1>
 
 <p align="center">
   <strong>The Self-Learning Cyber Swarm</strong><br>
