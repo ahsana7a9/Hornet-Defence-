@@ -3,18 +3,19 @@ import logging
 import random
 from collections import defaultdict, deque
 from core.network_monitor import get_live_connections
+from agents.agent_brain import AgentBrain  # Import the brain mix-in
 
 logger = logging.getLogger(__name__)
 
 BRUTE_PORTS  = {22: "SSH", 21: "FTP", 23: "Telnet", 3389: "RDP",
                 80: "HTTP", 443: "HTTPS", 3306: "MySQL", 5432: "PostgreSQL"}
-BRUTE_THRESH = 5   # connections from same IP to same port in 60s = brute force
+BRUTE_THRESH = 5   # Historical threshold (now used as a baseline for the Brain)
 
 
 class BruteAgent:
     """
     Brute-force detection agent — tracks repeated connections per IP/port.
-    Uses real /proc/net/tcp data, falls back to simulation.
+    Enhanced with MARL (Reinforcement Learning) and LLM Reasoning.
     """
 
     def __init__(self, agent_id: int):
@@ -22,6 +23,8 @@ class BruteAgent:
         self.name    = f"BruteAgent-{agent_id}"
         self._history: dict = defaultdict(lambda: deque(maxlen=500))
         self._use_real = self._check_real()
+        # Initialize the AI Brain
+        self.brain = AgentBrain()
 
     def _check_real(self) -> bool:
         try:
@@ -33,9 +36,18 @@ class BruteAgent:
             return False
 
     def collect_data(self) -> dict:
+        """Gathers data and consults the Brain for the best action."""
         if self._use_real:
-            return self._collect_real()
-        return self._collect_simulated()
+            data = self._collect_real()
+        else:
+            data = self._collect_simulated()
+        
+        # --- MARL DECISION STEP ---
+        # The brain decides if 'failed_attempts' justifies a BLOCK, MONITOR, or IGNORE
+        suggested_action = self.brain.decide(self.name, data)
+        data["suggested_action"] = suggested_action
+        
+        return data
 
     def _collect_real(self) -> dict:
         try:
@@ -53,7 +65,6 @@ class BruteAgent:
                 recent = [t for t in self._history[key] if now - t < 60]
                 ip_port_counts[key] = len(recent)
 
-            # Find brute-force candidates
             brute_attempts = [
                 {
                     "ip":      k[0],
@@ -64,7 +75,6 @@ class BruteAgent:
                 for k, v in ip_port_counts.items() if v >= BRUTE_THRESH
             ]
 
-            # Total failed attempts across all tracked pairs
             total_failed = sum(ip_port_counts.values())
             worst        = max(ip_port_counts, key=ip_port_counts.get) if ip_port_counts else None
             source       = worst[0] if worst else "network"
