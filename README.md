@@ -13,24 +13,24 @@
 <img src="https://img.shields.io/badge/Runtime-Ollama-black?style=for-the-badge">
 <img src="https://img.shields.io/badge/Lifecycle-Active_Development-orange?style=for-the-badge">
 </p>
-## 🛡️ Executive Summary
+##  Executive Summary
 **Hornet Defence** is a paradigm shift in digital asset protection. By transcending traditional heuristic and signature-based detection, we provide a **decentralized swarm of intelligent agents** designed to neutralize threats at the edge.
 Unlike legacy antivirus solutions, Hornet Defence leverages a collective intelligence model to identify, isolate, and adapt to zero-day vulnerabilities before they propagate.
  * **Proactive Neutralization:** Real-time threat hunting via autonomous agents.
  * **Collaborative Intelligence:** Multi-Agent Reinforcement Learning (MARL) for coordinated defense.
  * **Adaptive Evolution:** Continuous strategy refinement through LLM-driven decision-making.
-## ⚠️ The Problem
+##  The Problem
 Current cybersecurity infrastructure is fundamentally flawed by its **static nature**:
  * **Reactive Posture:** Reliance on known signatures leaves systems blind to novel exploits.
  * **Latent Response:** Centralized decision-making creates bottlenecks during high-velocity attacks.
  * **Predictability:** Linear defense logic is easily mapped and bypassed by sophisticated adversarial AI.
-## 💡 The Solution: Swarm-Cortex Architecture
+##  The Solution: Swarm-Cortex Architecture
 Hornet Defence implements a **Swarm-Cortex** framework, moving away from centralized vulnerability to distributed resilience.
  * **Autonomous Edge Agents:** Independent nodes that hunt and mitigate local threats.
  * **Global Q-Learning:** A shared neural memory ensures that when one agent learns a defense, the entire swarm inherits the immunity.
  * **LLM-Driven Heuristics:** Utilizing Llama 3 for high-context reasoning and complex threat analysis.
  * **Non-Linear Defense:** Dynamic strategy shifts that make the system an "unpredictable target" for attackers.
-## 🏗️ System Architecture
+##  System Architecture
 ```mermaid
 graph TD
     UI[User Management Dashboard] --> API[FastAPI Gateway]
