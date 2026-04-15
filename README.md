@@ -1,5 +1,5 @@
 <p align="center">
-<img src="https://raw.githubusercontent.com/ahsana7a9/Hornet-Defence-/main/assets/logo.png" width="500" alt="Hornet-Defence Logo">
+<img src="https://raw.githubusercontent.com/ahsana7a9/Hornet-Defence-/main/assets/Logo.png">
 </p>
 <h1 align="center">Hornet Defence</h1>
 <p align="center">
